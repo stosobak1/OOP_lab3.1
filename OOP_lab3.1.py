@@ -1,47 +1,40 @@
+
 import tkinter as tk
+import math
 
 # ===== БАЗОВЫЙ КЛАСС =====
 class Shape:
+    def __init__(self):
+        self.selected = False
+
     def draw(self, canvas):
         pass
+
+    def contains(self, x, y):
+        return False
 
 
 # ===== КРУГ =====
 class Circle(Shape):
     def __init__(self, x, y, radius=20):
+        super().__init__()
         self.x = x
         self.y = y
         self.radius = radius
-        print(f"Circle created at ({x}, {y})")
 
     def draw(self, canvas):
+        color = "red" if self.selected else "black"
         canvas.create_oval(
             self.x - self.radius,
             self.y - self.radius,
             self.x + self.radius,
             self.y + self.radius,
-            outline="black",
+            outline=color,
             width=2
         )
 
-
-# ===== ПРЯМОУГОЛЬНИК =====
-class Rectangle(Shape):
-    def __init__(self, x, y, size=30):
-        self.x = x
-        self.y = y
-        self.size = size
-        print(f"Rectangle created at ({x}, {y})")
-
-    def draw(self, canvas):
-        canvas.create_rectangle(
-            self.x - self.size,
-            self.y - self.size,
-            self.x + self.size,
-            self.y + self.size,
-            outline="blue",
-            width=2
-        )
+    def contains(self, x, y):
+        return math.hypot(x - self.x, y - self.y) <= self.radius
 
 
 # ===== КОНТЕЙНЕР =====
@@ -56,6 +49,16 @@ class ShapeContainer:
         for shape in self.shapes:
             shape.draw(canvas)
 
+    def clear_selection(self):
+        for shape in self.shapes:
+            shape.selected = False
+
+    def get_shapes_at(self, x, y):
+        return [s for s in self.shapes if s.contains(x, y)]
+
+    def delete_selected(self):
+        self.shapes = [s for s in self.shapes if not s.selected]
+
 
 # ===== ГЛАВНОЕ ОКНО =====
 class App:
@@ -66,32 +69,34 @@ class App:
         self.canvas = tk.Canvas(root, width=600, height=400, bg="white")
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
-        # контейнер вместо списка
         self.container = ShapeContainer()
-
-        # режим
-        self.mode = "circle"
 
         # события
         self.canvas.bind("<Button-1>", self.on_click)
-        self.root.bind("c", self.set_circle)
-        self.root.bind("r", self.set_rectangle)
-
-    def set_circle(self, event):
-        self.mode = "circle"
-        print("Mode: Circle")
-
-    def set_rectangle(self, event):
-        self.mode = "rectangle"
-        print("Mode: Rectangle")
+        self.root.bind("<Delete>", self.delete_selected)
 
     def on_click(self, event):
-        if self.mode == "circle":
-            shape = Circle(event.x, event.y)
-        else:
-            shape = Rectangle(event.x, event.y)
+        ctrl = (event.state & 0x0004) != 0  # Ctrl нажат?
 
-        self.container.add(shape)
+        shapes = self.container.get_shapes_at(event.x, event.y)
+
+        if shapes:
+            if not ctrl:
+                self.container.clear_selection()
+
+            for s in shapes:
+                s.selected = not s.selected if ctrl else True
+        else:
+            if not ctrl:
+                self.container.clear_selection()
+
+            circle = Circle(event.x, event.y)
+            self.container.add(circle)
+
+        self.redraw()
+
+    def delete_selected(self, event):
+        self.container.delete_selected()
         self.redraw()
 
     def redraw(self):
